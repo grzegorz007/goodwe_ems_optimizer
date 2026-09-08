@@ -1,0 +1,14 @@
+{
+  "domain": "goodwe_ems_optimizer",
+  "name": "GoodWe EMS Optimizer",
+  "codeowners": ["@grzegorz007"],
+  "config_flow": true,
+  "documentation": "https://github.com/grzegorz007/goodwe_ems_optimizer",
+  "homeassistant": "2024.1.0",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/grzegorz007/goodwe_ems_optimizer/issues",
+  "requirements": [
+    "async-timeout==4.0.3"
+  ],
+  "version": "0.1.0"
+}
