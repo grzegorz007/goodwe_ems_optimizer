@@ -74,132 +74,136 @@ class GoodWeEMSOptimizerOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: Optional[dict[str, Any]] = None):
         """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+        try:
+            if user_input is not None:
+                return self.async_create_entry(title="", data=user_input)
 
-        options = self.config_entry.options
+            options = self.config_entry.options
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SCAN_INTERVAL,
-                        default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
-                    vol.Optional(
-                        CONF_INVERTER_MODE_SELECT,
-                        default=options.get(CONF_INVERTER_MODE_SELECT, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="select",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_EMS_MODE_SELECT,
-                        default=options.get(CONF_EMS_MODE_SELECT, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="select",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_EMS_POWER_LIMIT,
-                        default=options.get(CONF_EMS_POWER_LIMIT, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="number",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_GRID_EXPORT_LIMIT,
-                        default=options.get(CONF_GRID_EXPORT_LIMIT, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="number",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_BATTERY_SOC_SENSOR,
-                        default=options.get(CONF_BATTERY_SOC_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_PV_POWER_SENSOR,
-                        default=options.get(CONF_PV_POWER_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_HOUSE_CONSUMPTION_SENSOR,
-                        default=options.get(CONF_HOUSE_CONSUMPTION_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_GRID_IMPORT_SENSOR,
-                        default=options.get(CONF_GRID_IMPORT_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_EMHASS_MIN_SOC_SENSOR,
-                        default=options.get(CONF_EMHASS_MIN_SOC_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_EMHASS_BATT_FORECAST_SENSOR,
-                        default=options.get(CONF_EMHASS_BATT_FORECAST_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_EMHASS_GRID_FORECAST_SENSOR,
-                        default=options.get(CONF_EMHASS_GRID_FORECAST_SENSOR, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            multiple=False,
-                        )
-                    ),
-                    vol.Optional(
+            schema = {
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                ): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
+                vol.Optional(
+                    CONF_INVERTER_MODE_SELECT,
+                    default=options.get(CONF_INVERTER_MODE_SELECT, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="select",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_EMS_MODE_SELECT,
+                    default=options.get(CONF_EMS_MODE_SELECT, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="select",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_EMS_POWER_LIMIT,
+                    default=options.get(CONF_EMS_POWER_LIMIT, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="number",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_GRID_EXPORT_LIMIT,
+                    default=options.get(CONF_GRID_EXPORT_LIMIT, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="number",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_BATTERY_SOC_SENSOR,
+                    default=options.get(CONF_BATTERY_SOC_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_PV_POWER_SENSOR,
+                    default=options.get(CONF_PV_POWER_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_HOUSE_CONSUMPTION_SENSOR,
+                    default=options.get(CONF_HOUSE_CONSUMPTION_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_GRID_IMPORT_SENSOR,
+                    default=options.get(CONF_GRID_IMPORT_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_EMHASS_MIN_SOC_SENSOR,
+                    default=options.get(CONF_EMHASS_MIN_SOC_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_EMHASS_BATT_FORECAST_SENSOR,
+                    default=options.get(CONF_EMHASS_BATT_FORECAST_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_EMHASS_GRID_FORECAST_SENSOR,
+                    default=options.get(CONF_EMHASS_GRID_FORECAST_SENSOR, ""),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        multiple=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_ENABLE_ANTI_TATTERING,
+                    default=options.get(
                         CONF_ENABLE_ANTI_TATTERING,
-                        default=options.get(
-                            CONF_ENABLE_ANTI_TATTERING,
-                            DEFAULT_ENABLE_ANTI_TATTERING,
-                        ),
-                    ): bool,
-                    vol.Optional(
+                        DEFAULT_ENABLE_ANTI_TATTERING,
+                    ),
+                ): bool,
+                vol.Optional(
+                    CONF_MIN_MODE_SWITCH_INTERVAL,
+                    default=options.get(
                         CONF_MIN_MODE_SWITCH_INTERVAL,
-                        default=options.get(
-                            CONF_MIN_MODE_SWITCH_INTERVAL,
-                            DEFAULT_MIN_MODE_SWITCH_INTERVAL,
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=10, max=600)),
-                }
-            ),
-        )
+                        DEFAULT_MIN_MODE_SWITCH_INTERVAL,
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=10, max=600)),
+            }
+
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema(schema),
+            )
+        except Exception as err:
+            _LOGGER.error("Error in options flow: %s", err, exc_info=True)
+            return self.async_abort(reason="unknown_error")
