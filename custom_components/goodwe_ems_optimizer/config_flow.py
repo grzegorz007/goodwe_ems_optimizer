@@ -8,6 +8,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers import selector
+from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
     CONF_BATTERY_SOC_SENSOR,
@@ -38,15 +39,25 @@ class GoodWeEMSOptimizerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for GoodWe EMS Optimizer."""
 
     VERSION = 1
+    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     async def async_step_user(
         self, user_input: Optional[Dict[str, Any]] = None
-    ) -> config_entries.FlowResult:
+    ) -> FlowResult:
         """Handle the initial step."""
+        errors: Dict[str, str] = {}
+
         if user_input is not None:
-            await self.async_set_unique_id(user_input[CONF_NAME])
+            name = user_input.get(CONF_NAME, TITLE)
+            await self.async_set_unique_id(name)
             self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
+            
+            # Store initial data and move to options
+            return self.async_create_entry(
+                title=name,
+                data={CONF_NAME: name},
+                options={},
+            )
 
         return self.async_show_form(
             step_id="user",
@@ -55,13 +66,14 @@ class GoodWeEMSOptimizerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_NAME, default=TITLE): str,
                 }
             ),
+            errors=errors,
         )
 
     @staticmethod
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
+    ) -> "GoodWeEMSOptimizerOptionsFlow":
         """Create the options flow."""
         return GoodWeEMSOptimizerOptionsFlow(config_entry)
 
@@ -75,7 +87,7 @@ class GoodWeEMSOptimizerOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
-    ) -> config_entries.FlowResult:
+    ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
