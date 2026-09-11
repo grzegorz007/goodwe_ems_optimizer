@@ -104,4 +104,14 @@ class GoodWeEMSOptimizerNumber(
 
     async def async_set_native_value(self, value: float) -> None:
         """Store the selected value as user automation intent."""
+        if value < self.native_min_value or value > self.native_max_value:
+            raise ValueError(f"Value out of range for {self.entity_id}: {value}")
+
+        min_value = float(self.native_min_value)
+        step = float(self.native_step)
+        normalized_steps = round((value - min_value) / step)
+        expected_value = min_value + (normalized_steps * step)
+        if abs(expected_value - value) > 1e-6:
+            raise ValueError(f"Value must match {step:g} W increments: {value}")
+
         self.coordinator.set_control_value(self._control_key, value)

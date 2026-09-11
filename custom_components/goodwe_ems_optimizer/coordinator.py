@@ -8,7 +8,7 @@ from typing import Any, Final
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -162,12 +162,10 @@ class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.data[ATTR_LAST_ACTION] = "monitoring cycle complete"
 
-    @callback
     def get_control_value(self, key: str) -> Any:
         """Return a user-controlled automation value."""
         return self.data[key]
 
-    @callback
     def set_control_value(
         self,
         key: str,

@@ -113,5 +113,8 @@ class GoodWeEMSOptimizerSelect(
 
     async def async_select_option(self, option: str) -> None:
         """Store the selected option as user automation intent."""
+        if option not in self.options:
+            raise ValueError(f"Invalid option for {self.entity_id}: {option}")
+
         self.coordinator.set_control_value(self._control_key, option)
         _LOGGER.debug("%s updated to %s", self.entity_id, option)
