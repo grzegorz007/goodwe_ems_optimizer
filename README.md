@@ -77,6 +77,11 @@ automation:
           entity_id: select.my_actual_goodwe_inverter_mode
         data:
           option: "{{ trigger.to_state.state }}"
+      - service: select.select_option
+        target:
+          entity_id: select.my_goodwe_ems_optimizer_requested_inverter_mode
+        data:
+          option: "none"
 ```
 
 ## Architecture

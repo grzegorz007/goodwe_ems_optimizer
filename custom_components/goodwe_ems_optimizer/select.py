@@ -117,4 +117,5 @@ class GoodWeEMSOptimizerSelect(
             raise ValueError(f"Invalid option for {self.entity_id}: {option}")
 
         self.coordinator.set_control_value(self._control_key, option)
+        self.async_write_ha_state()
         _LOGGER.debug("%s updated to %s", self.entity_id, option)
