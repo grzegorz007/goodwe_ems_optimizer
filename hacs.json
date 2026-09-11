@@ -1,0 +1,6 @@
+{
+  "name": "GoodWe EMS Optimizer",
+  "render_readme": true,
+  "homeassistant": "2024.1.0",
+  "domains": ["goodwe_ems_optimizer"]
+}

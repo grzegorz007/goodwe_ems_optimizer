@@ -1,8 +1,10 @@
 """Data coordinator for GoodWe EMS Optimizer integration."""
 
+from __future__ import annotations
+
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Final
+from datetime import timedelta
+from typing import Any, Final
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -17,26 +19,24 @@ from .const import (
     ATTR_GRID_IMPORT,
     ATTR_HOUSE_CONSUMPTION,
     ATTR_LAST_ACTION,
-    ATTR_LAST_MODE_SWITCH,
-    ATTR_MODE_SWITCH_LOCKED,
     ATTR_OPTIMIZER_ACTIVE,
+    ATTR_OPTIMIZER_MODE,
     ATTR_PV_POWER,
+    ATTR_REQUESTED_EMS_MODE,
+    ATTR_REQUESTED_EMS_POWER_LIMIT,
+    ATTR_REQUESTED_GRID_EXPORT_LIMIT,
+    ATTR_REQUESTED_INVERTER_MODE,
     CONF_BATTERY_SOC_SENSOR,
-    CONF_EMS_MODE_SELECT,
-    CONF_EMS_POWER_LIMIT,
     CONF_EMHASS_BATT_FORECAST_SENSOR,
     CONF_EMHASS_GRID_FORECAST_SENSOR,
     CONF_EMHASS_MIN_SOC_SENSOR,
-    CONF_ENABLE_ANTI_TATTERING,
-    CONF_GRID_EXPORT_LIMIT,
     CONF_GRID_IMPORT_SENSOR,
     CONF_HOUSE_CONSUMPTION_SENSOR,
-    CONF_INVERTER_MODE_SELECT,
-    CONF_MIN_MODE_SWITCH_INTERVAL,
     CONF_PV_POWER_SENSOR,
     CONF_SCAN_INTERVAL,
-    DEFAULT_ENABLE_ANTI_TATTERING,
-    DEFAULT_MIN_MODE_SWITCH_INTERVAL,
+    DEFAULT_CONTROL_SELECT_OPTION,
+    DEFAULT_OPTIMIZER_MODE,
+    DEFAULT_REQUESTED_POWER_LIMIT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -44,7 +44,7 @@ from .const import (
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator):
+class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinator for GoodWe EMS Optimizer."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -55,62 +55,32 @@ class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(
                 seconds=config_entry.options.get(
-                    CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                    CONF_SCAN_INTERVAL,
+                    config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 )
             ),
         )
         self.config_entry = config_entry
         self.hass = hass
 
-        # Configuration binding
-        self._inverter_mode_select: str = config_entry.data.get(
-            CONF_INVERTER_MODE_SELECT, ""
+        self._battery_soc_sensor = self._get_entry_value(CONF_BATTERY_SOC_SENSOR)
+        self._pv_power_sensor = self._get_entry_value(CONF_PV_POWER_SENSOR)
+        self._house_consumption_sensor = self._get_entry_value(
+            CONF_HOUSE_CONSUMPTION_SENSOR
         )
-        self._ems_mode_select: str = config_entry.data.get(CONF_EMS_MODE_SELECT, "")
-        self._ems_power_limit: str = config_entry.data.get(CONF_EMS_POWER_LIMIT, "")
-        self._grid_export_limit: str = config_entry.data.get(
-            CONF_GRID_EXPORT_LIMIT, ""
+        self._grid_import_sensor = self._get_entry_value(CONF_GRID_IMPORT_SENSOR)
+        self._emhass_min_soc_sensor = self._get_entry_value(CONF_EMHASS_MIN_SOC_SENSOR)
+        self._emhass_batt_forecast_sensor = self._get_entry_value(
+            CONF_EMHASS_BATT_FORECAST_SENSOR
         )
-        self._battery_soc_sensor: str = config_entry.data.get(
-            CONF_BATTERY_SOC_SENSOR, ""
-        )
-        self._pv_power_sensor: str = config_entry.data.get(CONF_PV_POWER_SENSOR, "")
-        self._house_consumption_sensor: str = config_entry.data.get(
-            CONF_HOUSE_CONSUMPTION_SENSOR, ""
-        )
-        self._grid_import_sensor: str = config_entry.data.get(
-            CONF_GRID_IMPORT_SENSOR, ""
-        )
-        self._emhass_min_soc_sensor: str = config_entry.data.get(
-            CONF_EMHASS_MIN_SOC_SENSOR, ""
-        )
-        self._emhass_batt_forecast_sensor: str = config_entry.data.get(
-            CONF_EMHASS_BATT_FORECAST_SENSOR, ""
-        )
-        self._emhass_grid_forecast_sensor: str = config_entry.data.get(
-            CONF_EMHASS_GRID_FORECAST_SENSOR, ""
+        self._emhass_grid_forecast_sensor = self._get_entry_value(
+            CONF_EMHASS_GRID_FORECAST_SENSOR
         )
 
-        # Anti-tattering configuration
-        self._enable_anti_tattering: bool = config_entry.data.get(
-            CONF_ENABLE_ANTI_TATTERING, DEFAULT_ENABLE_ANTI_TATTERING
-        )
-        self._min_mode_switch_interval: int = config_entry.data.get(
-            CONF_MIN_MODE_SWITCH_INTERVAL, DEFAULT_MIN_MODE_SWITCH_INTERVAL
-        )
-
-        # State tracking
-        self._last_mode_switch: Optional[datetime] = None
-        self._mode_switch_locked: bool = False
-        self._last_action: str = "initialized"
-        self._optimizer_active: bool = True
-
-        # Data snapshot
-        self.data: Dict[str, Any] = {
-            ATTR_OPTIMIZER_ACTIVE: self._optimizer_active,
-            ATTR_LAST_MODE_SWITCH: None,
-            ATTR_MODE_SWITCH_LOCKED: self._mode_switch_locked,
-            ATTR_LAST_ACTION: self._last_action,
+        self.data = {
+            ATTR_OPTIMIZER_ACTIVE: True,
+            ATTR_OPTIMIZER_MODE: DEFAULT_OPTIMIZER_MODE,
+            ATTR_LAST_ACTION: "initialized",
             ATTR_BATTERY_SOC: None,
             ATTR_PV_POWER: None,
             ATTR_HOUSE_CONSUMPTION: None,
@@ -118,54 +88,47 @@ class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator):
             ATTR_EMHASS_MIN_SOC: None,
             ATTR_EMHASS_BATT_FORECAST: None,
             ATTR_EMHASS_GRID_FORECAST: None,
+            ATTR_REQUESTED_INVERTER_MODE: DEFAULT_CONTROL_SELECT_OPTION,
+            ATTR_REQUESTED_EMS_MODE: DEFAULT_CONTROL_SELECT_OPTION,
+            ATTR_REQUESTED_EMS_POWER_LIMIT: DEFAULT_REQUESTED_POWER_LIMIT,
+            ATTR_REQUESTED_GRID_EXPORT_LIMIT: DEFAULT_REQUESTED_POWER_LIMIT,
         }
 
-        _LOGGER.debug("GoodWeEMSOptimizerCoordinator initialized")
+    def _get_entry_value(self, key: str, default: str = "") -> str:
+        """Return a config entry value, preferring options over stored data."""
+        return self.config_entry.options.get(
+            key,
+            self.config_entry.data.get(key, default),
+        )
 
-    async def _async_update_data(self) -> Dict[str, Any]:
+    async def _async_update_data(self) -> dict[str, Any]:
         """Fetch and update data from Home Assistant entities."""
         try:
-            # Collect current entity states
-            battery_soc = self._get_state_float(self._battery_soc_sensor)
-            pv_power = self._get_state_float(self._pv_power_sensor)
-            house_consumption = self._get_state_float(self._house_consumption_sensor)
-            grid_import = self._get_state_float(self._grid_import_sensor)
-            emhass_min_soc = self._get_state_float(self._emhass_min_soc_sensor)
-            emhass_batt_forecast = self._get_state_float(
+            self.data[ATTR_BATTERY_SOC] = self._get_state_float(self._battery_soc_sensor)
+            self.data[ATTR_PV_POWER] = self._get_state_float(self._pv_power_sensor)
+            self.data[ATTR_HOUSE_CONSUMPTION] = self._get_state_float(
+                self._house_consumption_sensor
+            )
+            self.data[ATTR_GRID_IMPORT] = self._get_state_float(self._grid_import_sensor)
+            self.data[ATTR_EMHASS_MIN_SOC] = self._get_state_float(
+                self._emhass_min_soc_sensor
+            )
+            self.data[ATTR_EMHASS_BATT_FORECAST] = self._get_state_float(
                 self._emhass_batt_forecast_sensor
             )
-            emhass_grid_forecast = self._get_state_float(
+            self.data[ATTR_EMHASS_GRID_FORECAST] = self._get_state_float(
                 self._emhass_grid_forecast_sensor
             )
 
-            _LOGGER.debug(
-                "Current state - SoC: %.1f%%, PV: %s W, Load: %s W, Grid: %s W",
-                battery_soc if battery_soc is not None else 0,
-                pv_power,
-                house_consumption,
-                grid_import,
-            )
+            optimizer_mode = self.data[ATTR_OPTIMIZER_MODE]
+            self.data[ATTR_OPTIMIZER_ACTIVE] = optimizer_mode != "disabled"
 
-            # Update data snapshot
-            self.data[ATTR_BATTERY_SOC] = battery_soc
-            self.data[ATTR_PV_POWER] = pv_power
-            self.data[ATTR_HOUSE_CONSUMPTION] = house_consumption
-            self.data[ATTR_GRID_IMPORT] = grid_import
-            self.data[ATTR_EMHASS_MIN_SOC] = emhass_min_soc
-            self.data[ATTR_EMHASS_BATT_FORECAST] = emhass_batt_forecast
-            self.data[ATTR_EMHASS_GRID_FORECAST] = emhass_grid_forecast
-
-            # Check and update mode switch lock state
-            self._update_mode_switch_lock()
-            self.data[ATTR_MODE_SWITCH_LOCKED] = self._mode_switch_locked
-            self.data[ATTR_LAST_MODE_SWITCH] = self._last_mode_switch
-
-            # Run optimization logic
-            if self._optimizer_active:
+            if optimizer_mode == "automatic":
                 await self._async_optimize()
-
-            self.data[ATTR_OPTIMIZER_ACTIVE] = self._optimizer_active
-            self.data[ATTR_LAST_ACTION] = self._last_action
+            elif optimizer_mode == "manual":
+                self.data[ATTR_LAST_ACTION] = "manual automation control"
+            else:
+                self.data[ATTR_LAST_ACTION] = "optimizer disabled"
 
             return self.data
 
@@ -173,7 +136,7 @@ class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Error updating coordinator data: %s", err, exc_info=True)
             raise UpdateFailed(f"Failed to update data: {err}") from err
 
-    def _get_state_float(self, entity_id: str) -> Optional[float]:
+    def _get_state_float(self, entity_id: str) -> float | None:
         """Get float value from entity state."""
         if not entity_id:
             return None
@@ -191,204 +154,41 @@ class GoodWeEMSOptimizerCoordinator(DataUpdateCoordinator):
             )
             return None
 
-    def _get_state_str(self, entity_id: str) -> Optional[str]:
-        """Get string value from entity state."""
-        if not entity_id:
-            return None
-
-        state = self.hass.states.get(entity_id)
-        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            _LOGGER.debug("Entity %s is unavailable or unknown", entity_id)
-            return None
-
-        return state.state
-
-    def _update_mode_switch_lock(self) -> None:
-        """Update the mode switch lock state based on time elapsed."""
-        if not self._enable_anti_tattering:
-            self._mode_switch_locked = False
-            return
-
-        if self._last_mode_switch is None:
-            self._mode_switch_locked = False
-            return
-
-        elapsed = (datetime.now() - self._last_mode_switch).total_seconds()
-        self._mode_switch_locked = elapsed < self._min_mode_switch_interval
-
-        if self._mode_switch_locked:
-            remaining = self._min_mode_switch_interval - elapsed
-            _LOGGER.debug(
-                "Mode switch locked for %.1f more seconds", remaining
-            )
-
     async def _async_optimize(self) -> None:
-        """
-        Main optimization logic (placeholder).
-        
-        This is where the black-box optimization algorithm runs.
-        It reads current state and applies decisions to inverter controls.
-        """
-        try:
-            if self.data[ATTR_BATTERY_SOC] is None:
-                _LOGGER.debug("Skipping optimization: battery SoC unavailable")
-                self._last_action = "skipped - no battery data"
-                return
+        """Keep the monitoring loop active without directly actuating the inverter."""
+        if self.data[ATTR_BATTERY_SOC] is None:
+            self.data[ATTR_LAST_ACTION] = "skipped - no battery data"
+            return
 
-            # Placeholder for optimization logic
-            # TODO: Implement EMS optimization algorithm
-            self._last_action = "optimization_cycle_complete"
+        self.data[ATTR_LAST_ACTION] = "monitoring cycle complete"
 
-            _LOGGER.debug("Optimization cycle completed: %s", self._last_action)
+    @callback
+    def get_control_value(self, key: str) -> Any:
+        """Return a user-controlled automation value."""
+        return self.data[key]
 
-        except Exception as err:
-            _LOGGER.error("Error during optimization: %s", err, exc_info=True)
-            self._last_action = f"error - {err}"
+    @callback
+    def set_control_value(
+        self,
+        key: str,
+        value: Any,
+        *,
+        update_listeners: bool = True,
+        record_action: bool = True,
+    ) -> None:
+        """Persist a user-controlled automation value in coordinator state."""
+        self.data[key] = value
 
-    async def async_set_inverter_mode(self, mode: str) -> bool:
-        """
-        Set the inverter working mode with anti-tattering protection.
-        
-        Args:
-            mode: Target mode (e.g., "general", "self_use")
-            
-        Returns:
-            True if mode was set, False if locked.
-        """
-        if self._mode_switch_locked:
-            _LOGGER.warning(
-                "Mode switch locked (%.1f seconds remaining)",
-                self._min_mode_switch_interval
-                - (datetime.now() - self._last_mode_switch).total_seconds(),
-            )
-            self._last_action = "mode_change_rejected_locked"
-            return False
+        if key == ATTR_OPTIMIZER_MODE:
+            self.data[ATTR_OPTIMIZER_ACTIVE] = value != "disabled"
 
-        try:
-            current_mode = self._get_state_str(self._inverter_mode_select)
-            if current_mode == mode:
-                _LOGGER.debug("Inverter already in mode: %s", mode)
-                self._last_action = f"mode_already_set - {mode}"
-                return True
+        if record_action:
+            self.data[ATTR_LAST_ACTION] = f"control intent updated - {key}"
 
-            _LOGGER.info("Setting inverter mode to: %s", mode)
-            await self.hass.services.async_call(
-                "select",
-                "select_option",
-                {
-                    "entity_id": self._inverter_mode_select,
-                    "option": mode,
-                },
-            )
-
-            self._last_mode_switch = datetime.now()
-            self._last_action = f"inverter_mode_changed - {mode}"
-            _LOGGER.info("Inverter mode changed to: %s", mode)
-            return True
-
-        except Exception as err:
-            _LOGGER.error("Error setting inverter mode: %s", err, exc_info=True)
-            self._last_action = f"mode_change_error - {err}"
-            return False
-
-    async def async_set_ems_mode(self, mode: str) -> bool:
-        """
-        Set the EMS mode.
-        
-        Args:
-            mode: Target EMS mode (e.g., "auto", "charge_battery")
-            
-        Returns:
-            True if mode was set, False otherwise.
-        """
-        try:
-            current_mode = self._get_state_str(self._ems_mode_select)
-            if current_mode == mode:
-                _LOGGER.debug("EMS already in mode: %s", mode)
-                self._last_action = f"ems_mode_already_set - {mode}"
-                return True
-
-            _LOGGER.info("Setting EMS mode to: %s", mode)
-            await self.hass.services.async_call(
-                "select",
-                "select_option",
-                {
-                    "entity_id": self._ems_mode_select,
-                    "option": mode,
-                },
-            )
-
-            self._last_action = f"ems_mode_changed - {mode}"
-            _LOGGER.info("EMS mode changed to: %s", mode)
-            return True
-
-        except Exception as err:
-            _LOGGER.error("Error setting EMS mode: %s", err, exc_info=True)
-            self._last_action = f"ems_mode_change_error - {err}"
-            return False
-
-    async def async_set_power_limit(self, power: float) -> bool:
-        """
-        Set the EMS power limit.
-        
-        Args:
-            power: Power limit in watts
-            
-        Returns:
-            True if power limit was set, False otherwise.
-        """
-        try:
-            _LOGGER.info("Setting EMS power limit to: %.1f W", power)
-            await self.hass.services.async_call(
-                "number",
-                "set_value",
-                {
-                    "entity_id": self._ems_power_limit,
-                    "value": power,
-                },
-            )
-
-            self._last_action = f"power_limit_set - {power:.1f}W"
-            _LOGGER.info("EMS power limit set to: %.1f W", power)
-            return True
-
-        except Exception as err:
-            _LOGGER.error("Error setting power limit: %s", err, exc_info=True)
-            self._last_action = f"power_limit_error - {err}"
-            return False
-
-    async def async_set_export_limit(self, power: float) -> bool:
-        """
-        Set the grid export limit.
-        
-        Args:
-            power: Export limit in watts
-            
-        Returns:
-            True if export limit was set, False otherwise.
-        """
-        try:
-            _LOGGER.info("Setting grid export limit to: %.1f W", power)
-            await self.hass.services.async_call(
-                "number",
-                "set_value",
-                {
-                    "entity_id": self._grid_export_limit,
-                    "value": power,
-                },
-            )
-
-            self._last_action = f"export_limit_set - {power:.1f}W"
-            _LOGGER.info("Grid export limit set to: %.1f W", power)
-            return True
-
-        except Exception as err:
-            _LOGGER.error("Error setting export limit: %s", err, exc_info=True)
-            self._last_action = f"export_limit_error - {err}"
-            return False
+        if update_listeners:
+            self.async_update_listeners()
 
     async def async_shutdown(self) -> None:
         """Shutdown the coordinator."""
         _LOGGER.info("Shutting down %s coordinator", DOMAIN)
-        self._optimizer_active = False
         self.data[ATTR_OPTIMIZER_ACTIVE] = False

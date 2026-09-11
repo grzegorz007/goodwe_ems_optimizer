@@ -1,26 +1,23 @@
 # GoodWe EMS Optimizer
 
-A black-box Energy Management System (EMS) optimizer integration for Home Assistant that controls GoodWe hybrid inverters based on optimized forecasts, dynamic pricing, and energy management strategies.
+A Home Assistant custom integration for monitoring GoodWe / EMS-related inputs and exposing optimizer control intent as Home Assistant entities. The integration no longer sends inverter commands directly from Python; instead, users can wire the exposed entities into their own Home Assistant automations.
 
 ## Features
 
-- 🔌 **Inverter Mode Control**: Automatic switching between `general` and `self_use` modes
-- ⚡ **EMS Mode Management**: Control `auto`, `charge_battery`, `discharge_battery`, `export_ac`, and `battery_standby` modes
-- 🔋 **Battery Optimization**: Battery SoC-aware decision making
-- 📊 **EMHASS Integration**: Support for EMHASS forecasts and optimization outputs
-- 💰 **Dynamic Pricing**: Pricing-aware charging/discharging strategies
-- 🛡️ **Anti-Tattering**: Hard-coded hysteresis filter to prevent inverter mode oscillations
-- 🎛️ **Config Flow UI**: Graphical entity binding without YAML editing
-- 📈 **Diagnostic Sensors**: Real-time monitoring of optimizer state and actions
+- 📊 **Monitoring-first flow**: Reads battery, PV, load, grid, and optional EMHASS sensors
+- 🎛️ **Automation control entities**: Exposes select/number entities that users can use as automation inputs or triggers
+- 🔍 **Transparent behavior**: Optimizer state and latest action are visible in Home Assistant
+- 🧩 **Config Flow UI**: Graphical setup for monitoring entity bindings without YAML editing
+- 🏠 **Private pre-release friendly**: Ready to test on a branch before publishing a release
 
 ## Installation
 
-### Via HACS
+### Via HACS (private testing)
 
 1. Open HACS in Home Assistant
-2. Go to **Integrations**
-3. Click **+ Create Integration** → Search for "GoodWe EMS Optimizer"
-4. Install and restart Home Assistant
+2. Add this repository as a **Custom repository**
+3. Choose the **Integration** category
+4. Install the integration and restart Home Assistant
 
 ### Manual
 
@@ -34,11 +31,7 @@ A black-box Energy Management System (EMS) optimizer integration for Home Assist
 All configuration is handled through the Home Assistant UI:
 
 1. **Name**: Integration instance name
-2. **Entity Bindings**:
-   - Inverter Working Mode Select
-   - EMS Mode Select
-   - EMS Power Limit (number)
-   - Grid Export Limit (number)
+2. **Monitoring entity bindings**:
    - Battery SoC Sensor
    - PV Power Sensor
    - House Consumption Sensor
@@ -46,61 +39,54 @@ All configuration is handled through the Home Assistant UI:
    - EMHASS Min SoC Sensor (optional)
    - EMHASS Battery Forecast Sensor (optional)
    - EMHASS Grid Forecast Sensor (optional)
-
-3. **Advanced Settings**:
+3. **Advanced settings**:
    - **Scan Interval**: Update frequency in seconds (default: 60)
-   - **Enable Anti-Tattering**: Prevent rapid mode switches (default: enabled)
-   - **Min Mode Switch Interval**: Minimum seconds between mode changes (default: 60)
 
-## Architecture
-
-### Core Components
-
-- **Config Flow** (`config_flow.py`): GUI for entity binding and parameter setup
-- **Coordinator** (`coordinator.py`): Core optimization logic, state management, and inverter control
-- **Sensors** (`sensor.py`): Diagnostic output showing optimizer state
-- **Select** (`select.py`): Optional mode selectors for manual override
-
-### Black-Box Design
-
-All optimization decisions are made internally in Python without exposing automations or complex logic to the user interface. The integration handles:
-
-- State machine transitions
-- Hysteresis filtering
-- Power calculations
-- Forecast evaluation
-- Pricing-based decisions
+Direct inverter-control bindings were intentionally removed from the options flow. Use the entities created by this integration in your own automations to call the actual inverter entities or services exposed elsewhere in Home Assistant.
 
 ## Entities Created
 
-### Sensors (Diagnostic)
+### Diagnostic sensor
 
-- `sensor.<name>_optimizer_active`: Whether the optimizer is running
-- `sensor.<name>_last_action`: Description of the last action taken
-- `sensor.<name>_last_mode_switch`: Timestamp of last inverter mode change
-- `sensor.<name>_mode_switch_locked`: Whether mode switching is currently locked
+- `sensor.<name>_status`
+  - State: `automatic`, `manual`, or `disabled`
+  - Attributes: latest action, monitored input snapshot, and current control intent values
 
-### Select (Optional)
+### Automation control entities
 
-- `select.<name>_optimizer_mode`: Manual mode override (automatic/manual/disabled)
+- `select.<name>_optimizer_mode`
+- `select.<name>_requested_inverter_mode`
+- `select.<name>_requested_ems_mode`
+- `number.<name>_requested_ems_power_limit`
+- `number.<name>_requested_grid_export_limit`
 
-## Anti-Tattering Protection
-
-The integration includes a hard-coded anti-tattering mechanism that prevents rapid oscillations of inverter modes:
-
-- **Lockout Duration**: Configurable 10-600 seconds (default: 60)
-- **Applies To**: Inverter mode changes only
-- **Benefit**: Reduces wear on inverter hardware and prevents command spam
-
-## Logging
-
-Enable debug logging to monitor optimizer behavior:
+These entities are intended to be referenced by Home Assistant automations. Example pattern:
 
 ```yaml
-logger:
-  logs:
-    homeassistant.components.goodwe_ems_optimizer: debug
+automation:
+  - alias: Apply requested inverter mode
+    trigger:
+      - platform: state
+        entity_id: select.goodwe_ems_optimizer_requested_inverter_mode
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'none' }}"
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.my_actual_goodwe_inverter_mode
+        data:
+          option: "{{ trigger.to_state.state }}"
 ```
+
+## Architecture
+
+- **Config Flow** (`config_flow.py`): GUI for monitoring entity bindings and scan interval
+- **Coordinator** (`coordinator.py`): Reads Home Assistant state and keeps optimizer/control intent state
+- **Sensors** (`sensor.py`): Diagnostic status view
+- **Select / Number** (`select.py`, `number.py`): User-controlled automation inputs
+
+The integration keeps relevant monitoring logic in Python, but inverter actuation is left to user-owned Home Assistant automations.
 
 ## Development
 
@@ -108,23 +94,15 @@ logger:
 
 ```
 custom_components/goodwe_ems_optimizer/
-├── manifest.json           # HACS metadata
-├── const.py                # Constants and enums
-├── __init__.py             # Component initialization
-├── config_flow.py          # UI configuration
-├── coordinator.py          # Core optimization logic
-├── sensor.py               # Diagnostic sensors
-└── select.py               # Optional selectors
+├── manifest.json
+├── const.py
+├── __init__.py
+├── config_flow.py
+├── coordinator.py
+├── sensor.py
+├── select.py
+└── number.py
 ```
-
-### Future Enhancements
-
-- [ ] Advanced optimization algorithm using EMHASS compute
-- [ ] Machine learning-based forecasting
-- [ ] Multi-tariff pricing support
-- [ ] Grid services integration
-- [ ] Predictive battery management
-- [ ] Web dashboard for monitoring
 
 ## Support
 
@@ -134,7 +112,3 @@ For issues, feature requests, or contributions, please visit:
 ## License
 
 MIT License - See LICENSE file for details
-
-## Disclaimer
-
-This integration is provided as-is. Use at your own risk. Always test thoroughly before deploying to a production environment. The developer is not responsible for any damage or data loss caused by using this integration.
