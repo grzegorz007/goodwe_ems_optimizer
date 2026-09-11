@@ -110,6 +110,7 @@ class GoodWeEMSOptimizerSelect(
                     last_state.state,
                     record_action=False,
                 )
+                self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
         """Store the selected option as user automation intent."""

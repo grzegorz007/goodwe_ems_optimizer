@@ -55,7 +55,7 @@ class GoodWeEMSOptimizerNumber(
     _attr_native_max_value = 50000
     _attr_native_step = 100
     _attr_native_unit_of_measurement = UnitOfPower.WATT
-    _attr_mode = NumberMode.BOX
+    _attr_mode = NumberMode.SLIDER
 
     def __init__(
         self,
@@ -107,9 +107,14 @@ class GoodWeEMSOptimizerNumber(
         min_value = float(self.native_min_value)
         max_value = float(self.native_max_value)
         step = float(self.native_step)
-        clamped_value = min(max(float(value), min_value), max_value)
-        normalized_steps = int(((clamped_value - min_value) / step) + 0.5)
+        candidate_value = float(value)
+        if candidate_value < min_value or candidate_value > max_value:
+            raise ValueError(f"Value out of range for {self.entity_id}: {value}")
+
+        normalized_steps = int(((candidate_value - min_value) / step) + 0.5)
         normalized_value = min_value + (normalized_steps * step)
+        if abs(normalized_value - candidate_value) > 1e-6:
+            raise ValueError(f"Value must match {step:g} W increments: {value}")
 
         self.coordinator.set_control_value(self._control_key, normalized_value)
         self.async_write_ha_state()
