@@ -48,17 +48,17 @@ Direct inverter-control bindings were intentionally removed from the options flo
 
 ### Diagnostic sensor
 
-- `sensor.<name>_status`
+- `sensor.<slugified integration name>_status`
   - State: `automatic`, `manual`, or `disabled`
   - Attributes: latest action, monitored input snapshot, and current control intent values
 
 ### Automation control entities
 
-- `select.<name>_optimizer_mode`
-- `select.<name>_requested_inverter_mode`
-- `select.<name>_requested_ems_mode`
-- `number.<name>_requested_ems_power_limit`
-- `number.<name>_requested_grid_export_limit`
+- `select.<slugified integration name>_optimizer_mode`
+- `select.<slugified integration name>_requested_inverter_mode`
+- `select.<slugified integration name>_requested_ems_mode`
+- `number.<slugified integration name>_requested_ems_power_limit`
+- `number.<slugified integration name>_requested_grid_export_limit`
 
 These entities are intended to be referenced by Home Assistant automations. Example pattern:
 
@@ -67,7 +67,7 @@ automation:
   - alias: Apply requested inverter mode
     trigger:
       - platform: state
-        entity_id: select.goodwe_ems_optimizer_requested_inverter_mode
+        entity_id: select.my_goodwe_ems_optimizer_requested_inverter_mode
     condition:
       - condition: template
         value_template: "{{ trigger.to_state.state != 'none' }}"
