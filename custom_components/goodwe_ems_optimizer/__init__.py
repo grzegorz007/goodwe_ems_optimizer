@@ -1,38 +1,53 @@
 """The GoodWe EMS Optimizer integration."""
+
 import logging
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+
+from .const import DOMAIN
+from .coordinator import GoodWeEMSOptimizerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "goodwe_ems_optimizer"
-PLATFORMS = ["sensor"]
+PLATFORMS = [Platform.SENSOR, Platform.SELECT, Platform.NUMBER]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GoodWe EMS Optimizer from a config entry."""
     _LOGGER.info("Setting up GoodWe EMS Optimizer")
-    
+
+    coordinator = GoodWeEMSOptimizerCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
+
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {}
-    
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
+    hass.data[DOMAIN][entry.entry_id] = {"coordinator": coordinator}
+
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        raise
+
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-    
+
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     _LOGGER.info("Unloading GoodWe EMS Optimizer")
-    
+
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
+
     if unload_ok:
+        coordinator: GoodWeEMSOptimizerCoordinator = hass.data[DOMAIN][entry.entry_id][
+            "coordinator"
+        ]
+        await coordinator.async_shutdown()
         hass.data[DOMAIN].pop(entry.entry_id)
-    
+
     return unload_ok
 
 
