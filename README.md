@@ -98,6 +98,7 @@ The integration keeps relevant monitoring logic in Python, but inverter actuatio
 ### Project Structure
 
 ```
+hacs.json
 custom_components/goodwe_ems_optimizer/
 ├── manifest.json
 ├── const.py

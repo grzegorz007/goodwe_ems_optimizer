@@ -108,7 +108,7 @@ class GoodWeEMSOptimizerNumber(
         max_value = float(self.native_max_value)
         step = float(self.native_step)
         clamped_value = min(max(float(value), min_value), max_value)
-        normalized_steps = round((clamped_value - min_value) / step)
+        normalized_steps = int(((clamped_value - min_value) / step) + 0.5)
         normalized_value = min_value + (normalized_steps * step)
 
         self.coordinator.set_control_value(self._control_key, normalized_value)
